@@ -77,6 +77,21 @@ class NSGAII(GeneticAlgorithm):
                  selector = TournamentSelector(2),
                  variator = None,
                  **kwargs):
+        """Constructs an instance of NSGA-II.
+        
+        Creates a new instance of the Nondominated Sorting Genetic Algorithm II.
+        
+        Example:
+            $ problem = DTLZ2(3)
+            $ algorithm = NSGAII(problem)
+        
+        Args:
+            problem (Problem): The problem definition
+            population_size (int): The size of the population
+            generator (Generator): The generator for initializing the population
+            selector (Selector): The selector for recombination operators
+            variator (Variator): The variator for recombination
+        """
         super(NSGAII, self).__init__(problem, population_size, generator, **kwargs)
         self.selector = selector
         self.variator = variator
