@@ -28,7 +28,7 @@ class TestPickling(unittest.TestCase):
         pickle.dumps(NSGAII(self.problem))
     
     def test_NSGAIII(self):
-        pickle.dumps(NSGAIII(self.problem, divisions_outer=24))
+        pickle.dumps(NSGAIII(self.problem, divisions=24))
         
     def test_CMAES(self):
         pickle.dumps(CMAES(self.problem))

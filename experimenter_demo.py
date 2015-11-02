@@ -8,7 +8,7 @@ if __name__ == "__main__":
     freeze_support() # required on Windows
     pool = Pool(6)
     
-    algorithms = [NSGAII, (NSGAIII, {"divisions_outer":12})]
+    algorithms = [NSGAII, (NSGAIII, {"divisions":12})]
     problems = [DTLZ2(3)]
     
     results = experiment(algorithms, problems, nfe=10000, map=pool.map)

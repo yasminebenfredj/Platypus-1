@@ -503,7 +503,7 @@ class MOEAD(GeneticAlgorithm):
 class NSGAIII(GeneticAlgorithm):
     
     def __init__(self, problem,
-                 divisions_outer,
+                 divisions,
                  divisions_inner = 0,
                  generator = RandomGenerator(),
                  selector = TournamentSelector(2),
@@ -513,12 +513,12 @@ class NSGAIII(GeneticAlgorithm):
         self.selector = selector
         self.variator = variator
         
-        self.population_size = choose(problem.nobjs + divisions_outer - 1, divisions_outer) + \
+        self.population_size = choose(problem.nobjs + divisions - 1, divisions) + \
                 (0 if divisions_inner == 0 else choose(problem.nobjs + divisions_inner - 1, divisions_inner))
         self.population_size = int(math.ceil(self.population_size / 4.0)) * 4;
 
         self.ideal_point = [POSITIVE_INFINITY]*problem.nobjs
-        self.reference_points = normal_boundary_weights(problem.nobjs, divisions_outer, divisions_inner)
+        self.reference_points = normal_boundary_weights(problem.nobjs, divisions, divisions_inner)
     
     def _find_extreme_points(self, solutions, objective):
         nobjs = self.problem.nobjs

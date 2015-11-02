@@ -5,7 +5,7 @@ from platypus.problems import DTLZ2
 problem = DTLZ2(3)
 
 # instantiate the optimization algorithm
-algorithm = NSGAIII(problem, divisions_outer=12)
+algorithm = NSGAIII(problem, divisions=12)
 
 # optimize the problem using 10,000 function evaluations
 algorithm.run(10000)

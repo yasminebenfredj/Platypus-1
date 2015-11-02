@@ -12,7 +12,7 @@ if __name__ == '__main__':
     # setup the experiment
     problem = DTLZ2(3)
     algorithms = [NSGAII,
-                  (NSGAIII, {"divisions_outer":12}),
+                  (NSGAIII, {"divisions":12}),
                   (CMAES, {"epsilons":[0.05]}),
                   GDE3,
                   IBEA,

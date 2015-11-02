@@ -38,7 +38,7 @@ the results using ``display``.
     from platypus.experimenter import experiment, calculate, display
 
     if __name__ == "__main__":
-        algorithms = [NSGAII, (NSGAIII, {"divisions_outer":12})]
+        algorithms = [NSGAII, (NSGAIII, {"divisions":12})]
         problems = [DTLZ2(3)]
     
         # run the experiment
@@ -65,7 +65,7 @@ Once this data is collected, we can then use statistical tests to determine if
 there is any statistical difference between the results.  In this case, we
 may want to use the Mann-Whitney U test from ``scipy.stats.mannwhitneyu``.
 
-Note how we listed the algorithms: ``[NSGAII, (NSGAIII, {"divisions_outer":12})]``.
+Note how we listed the algorithms: ``[NSGAII, (NSGAIII, {"divisions":12})]``.
 Normally you just need to provide the algorithm type, but if you want to
 customize the algorithm, you can also provide optional arguments.  To do so,
 you need to pass a tuple with the values ``(type, dict)``, where dict is a
@@ -73,7 +73,7 @@ dictionary containing the arguments.  If you want to test the same algorithm
 with different parameters, pass in a three-element tuple containing
 ``(type, dict, name)``.  The name element provides a custom name for the
 algorithm that will appear in the output.  For example, we could use
-``(NSGAIII, {"divisions_outer":24}, "NSGAIII_24")``.  The names must be unique.
+``(NSGAIII, {"divisions":24}, "NSGAIII_24")``.  The names must be unique.
         
 Parallelization
 ---------------
@@ -94,7 +94,7 @@ as demonstrated below:
         freeze_support() # required on Windows
         pool = Pool(6)
     
-        algorithms = [NSGAII, (NSGAIII, {"divisions_outer":12})]
+        algorithms = [NSGAII, (NSGAIII, {"divisions":12})]
         problems = [DTLZ2(3)]
 
         results = experiment(algorithms, problems, nfe=10000, map=pool.map)
@@ -118,7 +118,7 @@ module:
     from concurrent.futures import ProcessPoolExecutor
 
     if __name__ == "__main__":
-        algorithms = [NSGAII, (NSGAIII, {"divisions_outer":12})]
+        algorithms = [NSGAII, (NSGAIII, {"divisions":12})]
         problems = [DTLZ2(3)]
         
         with ProcessPoolExecutor(6) as pool:
@@ -160,7 +160,7 @@ require additional parameters.
        # setup the experiment
        problem = DTLZ2(3)
        algorithms = [NSGAII,
-                     (NSGAIII, {"divisions_outer":12}),
+                     (NSGAIII, {"divisions":12}),
                      (CMAES, {"epsilons":[0.05]}),
                      GDE3,
                      IBEA,

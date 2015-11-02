@@ -31,14 +31,14 @@ class PlatypusError(Exception):
 def evaluator(func):
     """Decorates for a problem's evaluate method.
     
-    Ensures the evaluated solution's ``evaluated`` attribute is set to True
-    by the evaluate method.
+    Ensures the evaluated solution's ``evaluated``, ``constraint_violation``,
+    and ``is_feasible`` attributes are set to True by the evaluate method.
     """
     @functools.wraps(func)
     def inner(self, solution):
         func(self, solution)
         solution.constraint_violation = sum([abs(f(x)) for (f, x) in zip(solution.problem.constraints, solution.constraints)])
-        solution.feasible = solution.constraint_violation == 0.0
+        solution.is_feasible = solution.constraint_violation == 0.0
         solution.evaluated = True
     return inner
 
