@@ -26,6 +26,9 @@ import operator
 import itertools
 import functools
 from abc import ABCMeta, abstractmethod
+
+import numpy as np
+
 from .core import Algorithm, ParetoDominance, AttributeDominance,\
     AttributeDominance, nondominated_sort, nondominated_prune,\
     nondominated_truncate, nondominated_split, crowding_distance,\
@@ -40,6 +43,7 @@ from .tools import DistanceMatrix, choose, point_line_dist, lsolve,\
     tred2, tql2, check_eigensystem, remove_keys, only_keys_for
 from .weights import random_weights, chebyshev, normal_boundary_weights
 from .config import default_variator, default_mutator
+
 
 try:
     set
@@ -275,6 +279,7 @@ class EpsMOEA(AbstractGeneticAlgorithm):
         elif not dominated:
             self.population.remove(random.choice(self.population))
             self.population.append(solution)
+
 
 class GDE3(AbstractGeneticAlgorithm):
     
@@ -906,7 +911,8 @@ class ParticleSwarm(Algorithm):
         if self.mutate is not None:
             for i in range(self.swarm_size):
                 self.particles[i] = self.mutate.mutate([self.particles[i]])[0]
-                
+
+
 class OMOPSO(ParticleSwarm):
      
     def __init__(self, problem,
@@ -958,6 +964,7 @@ class OMOPSO(ParticleSwarm):
                 self.particles[i] = self.nonuniform_mutation.mutate(self.particles[i])
             elif i % 3 == 1:
                 self.particles[i] = self.uniform_mutation.mutate(self.particles[i])
+
 
 class SMPSO(ParticleSwarm):
      
@@ -1661,4 +1668,175 @@ class EpsNSGAII(AdaptiveTimeContinuation):
                        variator,
                        EpsilonBoxArchive(epsilons),
                        **kwargs))
-        
+
+
+class COA(Algorithm):
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self, problem,
+                 n_packs = 20,
+                 n_coy = 5,
+                 lb = -10,
+                 ub = 10,
+                 random_seed = 1,
+                 generator=RandomGenerator(),
+                 **kwargs):
+
+        super(COA, self).__init__(problem, **kwargs)
+        self.n_packs = n_packs
+        self.n_coy = n_coy
+        self.fobj = problem.function
+        self.generator = generator
+        self.dimension = problem.nvars
+        self.p_leave = 0.005 * (n_coy ** 2)
+        self.pop_total = n_packs*n_coy
+        self.lu = np.zeros((2,problem.nvars))
+        self.lu[0, :] = lb
+        self.lu[1, :] = ub
+        self.nfe = self.pop_total
+        self.result = 0
+
+        from numpy.random import MT19937
+        from numpy.random import RandomState, SeedSequence
+
+        self.rs = RandomState(MT19937(SeedSequence(random_seed)))
+
+    def step(self):
+        if self.nfe == self.pop_total:
+            self.initialize()
+            self.iterate()
+
+        else:
+            self.iterate()
+            self.result = self.globalMin
+
+    def initialize(self):
+        self.VarMin = self.lu[0]
+        self.VarMax = self.lu[1]
+        self.costs = np.zeros((1, self.pop_total))
+        self.coyotes = np.tile(self.VarMin, [self.pop_total, 1]) + self.rs.rand(self.pop_total, self.dimension) * np.tile(self.VarMax, [self.pop_total, 1]) - \
+              np.tile(self.VarMin, [self.pop_total, 1])
+        self.ages = np.zeros((1, self.pop_total))
+        self.packs = self.rs.permutation(self.pop_total).reshape(self.n_packs, self.n_coy)
+        self.evaluate_all()
+        self._select_leader()
+
+    def evaluate_all(self):
+        for c in range(self.pop_total):
+            self.costs[0, c] = self.fobj(self.coyotes[c, :])
+
+    def iterate(self):
+        self._update_packs()
+        self._migration()
+        self.ages += 1
+        self._select_leader()
+
+    def _migration(self):
+        # A coyote can leave a pack and enter in another pack (Eq. 4)
+        if self.n_packs > 1:
+            if self.rs.rand() < self.p_leave:
+                rp = self.rs.permutation(self.n_packs)[:2]
+                rc = [self.rs.randint(0, self.n_coy), self.rs.randint(0, self.n_coy)]
+                aux = self.packs[rp[0], rc[0]]
+                self.packs[rp[0], rc[0]] = self.packs[rp[1], rc[1]]
+                self.packs[rp[1], rc[1]] = aux
+
+    def _update_packs(self):
+        for p in range(self.n_packs):
+            # Get the coyotes that belong to each pack
+            self.coyotes_aux = self.coyotes[self.packs[p, :], :]
+            self.costs_aux = self.costs[0, self.packs[p, :]]
+            self.ages_aux = self.ages[0, self.packs[p, :]]
+
+            # Detect alphas according to the costs (Eq. 5)
+            ind = np.argsort(self.costs_aux)
+            self.costs_aux = self.costs_aux[ind]
+            self.coyotes_aux = self.coyotes_aux[ind, :]
+            self.ages_aux = self.ages_aux[ind]
+            self.c_alpha = self.coyotes_aux[0, :]
+
+            # Compute the social tendency of the pack (Eq. 6)
+            self.tendency = np.median(self.coyotes_aux, 0)
+
+            self._update_coyotes()
+            self._birth_new_coyote()
+
+            # Update the pack information
+            self.coyotes[self.packs[p], :] = self.coyotes_aux
+            self.costs[0, self.packs[p]] = self.costs_aux
+            self.ages[0, self.packs[p]] = self.ages_aux
+
+    def _update_coyotes(self):
+        #  Update coyotes' social condition
+        new_coyotes = np.zeros((self.n_coy, self.dimension))
+        for c in range(self.n_coy):
+            rc1 = c
+            while rc1 == c:
+                rc1 = self.rs.randint(self.n_coy)
+            rc2 = c
+            while rc2 == c or rc2 == rc1:
+                rc2 = self.rs.randint(self.n_coy)
+
+            # Try to update the social condition according
+            # to the alpha and the pack tendency(Eq. 12)
+            new_coyotes[c, :] = self.coyotes_aux[c, :] + self.rs.rand() * (self.c_alpha - self.coyotes_aux[rc1, :]) + \
+                                self.rs.rand() * (self.tendency - self.coyotes_aux[rc2, :])
+
+            # Keep the coyotes in the search space (optimization problem constraint)
+            new_coyotes[c, :] = self._Limita(new_coyotes[c, :])
+
+            # Evaluate the new social condition (Eq. 13)
+            new_cost = self.fobj(new_coyotes[c, :])
+            self.nfe += 1
+
+            # Adaptation (Eq. 14)
+            if new_cost < self.costs_aux[c]:
+                self.costs_aux[c] = new_cost
+                self.coyotes_aux[c, :] = new_coyotes[c, :]
+
+    def _birth_new_coyote(self):
+        # Birth of a new coyote from rs parents (Eq. 7 and Alg. 1)
+        parents = self.rs.permutation(self.n_coy)[:2]
+        prob1 = (1 - (1/self.dimension)) / 2
+        prob2 = prob1
+        pdr = self.rs.permutation(self.dimension)
+        p1 = np.zeros((1, self.dimension))
+        p2 = np.zeros((1, self.dimension))
+        p1[0, pdr[0]] = 1  # Guarantee 1 charac. per individual
+        p2[0, pdr[1]] = 1  # Guarantee 1 charac. per individual
+        r = self.rs.rand(1, self.dimension - 2)
+        p1[0, pdr[2:]] = r < prob1
+        p2[0, pdr[2:]] = r > 1 - prob2
+
+        # Eventual noise
+        n = np.logical_not(np.logical_or(p1, p2))
+
+        # Generate the pup considering intrinsic and extrinsic influence
+        pup = p1 * self.coyotes_aux[parents[0], :] + \
+              p2 * self.coyotes_aux[parents[1], :] + \
+              n * (self.VarMin + self.rs.rand(1, self.dimension) * (self.VarMax - self.VarMin))
+
+        # Verify if the pup will survive
+        pup_cost = self.fobj(pup[0, :])
+        self.nfe += 1
+        worst = np.flatnonzero(self.costs_aux > pup_cost)
+        if len(worst) > 0:
+            older = np.argsort(self.ages_aux[worst])
+            which = worst[older[::-1]]
+            self.coyotes_aux[which[0], :] = pup
+            self.costs_aux[which[0]] = pup_cost
+            self.ages_aux[which[0]] = 0
+
+    def _select_leader(self):
+        # Output variables (best alpha coyote among all alphas)
+        self.globalMin = np.min(self.costs[0, :])
+        ibest = np.argmin(self.costs)
+        self.globalParams = self.coyotes[ibest, :]
+
+    def _Limita(self,X):
+        # Keep the coyotes in the search space (optimization problem constraint)
+        for abc in range(self.dimension):
+            X[abc] = max([min([X[abc], self.VarMax[abc]]), self.VarMin[abc]])
+        return X
+
